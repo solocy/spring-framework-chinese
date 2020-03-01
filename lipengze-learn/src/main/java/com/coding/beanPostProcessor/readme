@@ -1,0 +1,1 @@
+创建BeanPostProcessor实现类来插手bean的实例化
