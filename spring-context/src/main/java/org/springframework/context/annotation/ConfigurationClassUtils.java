@@ -16,14 +16,8 @@
 
 package org.springframework.context.annotation;
 
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.framework.AopInfrastructureBean;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -40,6 +34,11 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Utilities for identifying {@link Configuration} classes.
@@ -88,16 +87,31 @@ abstract class ConfigurationClassUtils {
 		if (className == null || beanDef.getFactoryMethodName() != null) {
 			return false;
 		}
-
+		//类的元数据（类的信息）
 		AnnotationMetadata metadata;
+		/**
+		 * 判断是否是 AnnotatedBeanDefinition，此时我们的bean工厂的map里面，初始化添加的都是RootBeanDefinition，只有我们自己写的是属于AnnotatedBeanDefinition
+		 */
 		if (beanDef instanceof AnnotatedBeanDefinition &&
 				className.equals(((AnnotatedBeanDefinition) beanDef).getMetadata().getClassName())) {
 			// Can reuse the pre-parsed metadata from the given BeanDefinition...
+			/**
+			 * 如果 BeanDefinition 是 AnnotatedBeanDefinition 的实例，并且className 和 BeanDefinition 的元数据的类名相同
+			 * 则直接从 BeanDefinition 获得 Metadata
+			 *
+			 * 注意：这个 beanDef 是属于 AnnotatedBeanDefinition 还是其他类型的 BeanDefinition 拿到的元数据的方式是不同的。因为 AnnotatedBeanDefinition 里面我们写的都是注解
+			 */
 			metadata = ((AnnotatedBeanDefinition) beanDef).getMetadata();
 		}
+		/**
+		 * 如果是 AbstractBeanDefinition 类型的，则通过这种方式拿到元数据
+		 */
 		else if (beanDef instanceof AbstractBeanDefinition && ((AbstractBeanDefinition) beanDef).hasBeanClass()) {
 			// Check already loaded Class if present...
 			// since we possibly can't even load the class file for this Class.
+			/**
+			 * todo 暂时不知道这里做了，什么但是有可能返回false，这跟之前的版本不太一样
+			 */
 			Class<?> beanClass = ((AbstractBeanDefinition) beanDef).getBeanClass();
 			if (BeanFactoryPostProcessor.class.isAssignableFrom(beanClass) ||
 					BeanPostProcessor.class.isAssignableFrom(beanClass) ||
@@ -105,8 +119,12 @@ abstract class ConfigurationClassUtils {
 					EventListenerFactory.class.isAssignableFrom(beanClass)) {
 				return false;
 			}
+			//看源码可以知道，这里是通过 new StandardAnnotationMetadata的方式拿到元数据
 			metadata = AnnotationMetadata.introspect(beanClass);
 		}
+		/**
+		 * 第三种拿到元数据的方式
+		 */
 		else {
 			try {
 				MetadataReader metadataReader = metadataReaderFactory.getMetadataReader(className);
@@ -122,9 +140,23 @@ abstract class ConfigurationClassUtils {
 		}
 
 		Map<String, Object> config = metadata.getAnnotationAttributes(Configuration.class.getName());
+		/**
+		 * 判断 config 中的AnnotationAttributes中的key -- proxyBeanMethods 对应的不等于false，则为bd设置configurationClass属性为full
+		 *
+		 * todo 没看明白 按道理应该是和判断是不是有@Configutation有关
+		 */
 		if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);
 		}
+		/**
+		 * isConfigurationCandidate(metadata)里面的方法
+		 * candidateIndicators.add(Component.class.getName());
+	     * candidateIndicators.add(ComponentScan.class.getName());
+	     * candidateIndicators.add(Import.class.getName());
+	     * candidateIndicators.add(ImportResource.class.getName());
+		 *
+		 * 这里会判断这些bd是否是加了@Component，@ComponentScan，@Import，@ImportResource注解，如果是，则为bd设置configurationClass属性为lite
+		 */
 		else if (config != null || isConfigurationCandidate(metadata)) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);
 		}
@@ -133,6 +165,9 @@ abstract class ConfigurationClassUtils {
 		}
 
 		// It's a full or lite configuration candidate... Let's determine the order value, if any.
+		/**
+		 * 这里是排序，不重要
+		 */
 		Integer order = getOrder(metadata);
 		if (order != null) {
 			beanDef.setAttribute(ORDER_ATTRIBUTE, order);

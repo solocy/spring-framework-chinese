@@ -81,10 +81,13 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 		 *
 		 * 创建一个读取注解的bean定义读取器
 		 * 什么是bean定义？BeanDefinition
+		 *
+		 * 主要是往bean工厂中添加了几个非常重要的 beanPostProcessor 和 一个 BeanFactoryPostProcessor
 		 */
 		this.reader = new AnnotatedBeanDefinitionReader(this);
-
-
+		/**
+		 * ClassPathBeanDefinitionScanner 能够扫描一个类，并且转换成bd
+		 */
 		this.scanner = new ClassPathBeanDefinitionScanner(this);
 	}
 

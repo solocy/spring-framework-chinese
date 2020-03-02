@@ -174,7 +174,6 @@ public abstract class BeanDefinitionReaderUtils {
 		 * 	注意：我们在代码执行到这里的时候，map中先前已经存在6个对象了（这6个对象非常重要，可以通过调试拿出来这6个类）
 		 *  把bd对应的名字放到了 beanDefinitionNames 中这个是ArrayList类型
 		 */
-
 		registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
 
 		// Register aliases for bean name, if any.  这里下面的代码不重要，是处理别名的

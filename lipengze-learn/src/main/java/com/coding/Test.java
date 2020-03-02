@@ -18,10 +18,13 @@ public class Test {
 		AnnotationConfigApplicationContext annotationConfigApplicationContext =
 				new AnnotationConfigApplicationContext();
 		annotationConfigApplicationContext.register(AppConfig.class);
+//		annotationConfigApplicationContext.addBeanFactoryPostProcessor(new TestBeanFactoryProcessor());
 //		annotationConfigApplicationContext.register(MyDaoImpl.class);
 		annotationConfigApplicationContext.refresh();
 
 		MyDao myDaoImpl = (MyDao)annotationConfigApplicationContext.getBean("myDaoImpl");
+		MyDao myDaoImpl1 = (MyDao)annotationConfigApplicationContext.getBean("myDaoImpl");
+		System.out.println(myDaoImpl.hashCode()+"-------"+myDaoImpl1.hashCode());
 		myDaoImpl.say("你好!!");
 	}
 }

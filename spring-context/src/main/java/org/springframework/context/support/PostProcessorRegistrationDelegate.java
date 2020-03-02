@@ -16,29 +16,19 @@
 
 package org.springframework.context.support;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
-import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.beans.factory.support.*;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
 import org.springframework.core.PriorityOrdered;
 import org.springframework.lang.Nullable;
+
+import java.util.*;
 
 /**
  * Delegate for AbstractApplicationContext's post-processor handling.
@@ -60,7 +50,17 @@ final class PostProcessorRegistrationDelegate {
 
 		if (beanFactory instanceof BeanDefinitionRegistry) {
 			BeanDefinitionRegistry registry = (BeanDefinitionRegistry) beanFactory;
+			/**
+			 * 存放的是程序员自定实现了 BeanFactoryPostProcessor 的对象
+			 */
 			List<BeanFactoryPostProcessor> regularPostProcessors = new ArrayList<>();
+			/**
+			 * 这里的list存放的是我们程序员自己实现了 BeanDefinitionRegistryPostProcessor 的对象
+			 *
+			 * BeanDefinitionRegistryPostProcessor（接口）继承了 BeanFactoryPostProcessor（接口）
+			 * 这个 BeanDefinitionRegistryPostProcessor 是扩展bean的第三种方式，更牛逼！！
+			 * 用法：
+			 */
 			List<BeanDefinitionRegistryPostProcessor> registryProcessors = new ArrayList<>();
 
 			for (BeanFactoryPostProcessor postProcessor : beanFactoryPostProcessors) {
@@ -79,19 +79,43 @@ final class PostProcessorRegistrationDelegate {
 			// uninitialized to let the bean factory post-processors apply to them!
 			// Separate between BeanDefinitionRegistryPostProcessors that implement
 			// PriorityOrdered, Ordered, and the rest.
+			/**
+			 * 上面已经定义了一个 List<BeanDefinitionRegistryPostProcessor> registryProcessors 这里为什么又定义了一个同样类型的list呢？
+			 * 因为：这里面放的是spring自己实现了 BeanDefinitionRegistryPostProcessor 接口的对象
+			 */
 			List<BeanDefinitionRegistryPostProcessor> currentRegistryProcessors = new ArrayList<>();
 
 			// First, invoke the BeanDefinitionRegistryPostProcessors that implement PriorityOrdered.
+			/**
+			 * 得到spring内部自己维护的实现了 BeanDefinitionRegistryPostProcessor 的类的名字
+			 */
 			String[] postProcessorNames =
+					/**
+					 * getBeanNamesForType() 顾名思义 是通过类型得到bean的名字，这里的type是bd当中描述当前类的class类型。之前我们我们在reader构造方法中，默认
+					 * 添加的 ConfigurationClassPostProcessor 这类它就实现了 BeanDefinitionRegistryPostProcessor接口。
+					 */
 					beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, true, false);
+
 			for (String ppName : postProcessorNames) {
 				if (beanFactory.isTypeMatch(ppName, PriorityOrdered.class)) {
+					/**
+					 * 通过上面得到的名字，去bean工厂中拿出来对应的bd，其实就是 ConfigurationClassPostProcessor，然后放到 currentRegistryProcessors list集合中去
+					 */
 					currentRegistryProcessors.add(beanFactory.getBean(ppName, BeanDefinitionRegistryPostProcessor.class));
+					/**
+					 * 把名字放到 processedBeans 这个set集合中
+					 */
 					processedBeans.add(ppName);
 				}
 			}
+			//排序不重要，况且 currentRegistryProcessors 这里也只有一个数据
 			sortPostProcessors(currentRegistryProcessors, beanFactory);
+			//合并list，不重要（为什么要合并，因为还有自己的）
 			registryProcessors.addAll(currentRegistryProcessors);
+			/**
+			 * 最重要。注意这里是方法调用。调用这个方法的意义在哪里？
+			 *
+			 */
 			invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);
 			currentRegistryProcessors.clear();
 
@@ -272,6 +296,12 @@ final class PostProcessorRegistrationDelegate {
 			Collection<? extends BeanDefinitionRegistryPostProcessor> postProcessors, BeanDefinitionRegistry registry) {
 
 		for (BeanDefinitionRegistryPostProcessor postProcessor : postProcessors) {
+			/**
+			 * 这里至少调用了 ConfigurationClassPostProcessor 的 postProcessBeanDefinitionRegistry()。如果我们也写了实现了 BeanDefinitionRegistryPostProcessor
+			 * 的方法，也会调用。
+			 *
+			 *注意 点击去看 ConfigurationClassPostProcessor 调用的 postProcessBeanDefinitionRegistry()
+			 */
 			postProcessor.postProcessBeanDefinitionRegistry(registry);
 		}
 	}
