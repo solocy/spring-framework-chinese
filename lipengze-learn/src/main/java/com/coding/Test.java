@@ -20,6 +20,7 @@ public class Test {
 		annotationConfigApplicationContext.register(AppConfig.class);
 //		annotationConfigApplicationContext.addBeanFactoryPostProcessor(new TestBeanFactoryProcessor());
 //		annotationConfigApplicationContext.register(MyDaoImpl.class);
+//		annotationConfigApplicationContext.scan("com.coding");
 		annotationConfigApplicationContext.refresh();
 
 		MyDao myDaoImpl = (MyDao)annotationConfigApplicationContext.getBean("myDaoImpl");

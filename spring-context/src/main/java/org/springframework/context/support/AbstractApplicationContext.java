@@ -513,7 +513,9 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				// Invoke factory processors registered as beans in the context.
 				/**
 				 * 在spring的环境中去执行已经被注册的 factory processors
-				 * 设置执行定义的ProcessBeanFactory
+				 * 设置执行自定义的ProcessBeanFactory 和 spring自己内部定义的
+				 * 如果这里我们没有写实现 BeanFactoryPostProcessors 接口的类，那么执行的就只有一个，就是之前放到bean工厂map中
+				 * 的 ConfigurationClassPostProcessor 里面的方法
 				 */
 				invokeBeanFactoryPostProcessors(beanFactory);
 
@@ -691,6 +693,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		}
 
 		// Register default environment beans.
+		/**
+		 * 如果自定义的Bean中没有名为 SystemProperties 和 SystemEnvironment 的bean
+		 * 则注册两个bean，key为 SystemProperties 和 SystemEnvironment，value为Map
+		 * 这两个bean就是一些系统配置和系统环境信息
+		 */
 		if (!beanFactory.containsLocalBean(ENVIRONMENT_BEAN_NAME)) {
 			beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
 		}

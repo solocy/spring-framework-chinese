@@ -305,6 +305,9 @@ class ConfigurationClassParser {
 		}
 
 		// Process any @Import annotations
+		/**
+		 * 处理 @Import 这个也很重要
+		 */
 		processImports(configClass, sourceClass, getImports(sourceClass), filter, true);
 
 		// Process any @ImportResource annotations
@@ -551,6 +554,7 @@ class ConfigurationClassParser {
 			Collection<SourceClass> importCandidates, Predicate<String> exclusionFilter,
 			boolean checkForCircularImports) {
 
+		//判断有没有加@Import注解
 		if (importCandidates.isEmpty()) {
 			return;
 		}
@@ -562,6 +566,9 @@ class ConfigurationClassParser {
 			this.importStack.push(configClass);
 			try {
 				for (SourceClass candidate : importCandidates) {
+					/**
+					 * 判断判断@Import 里面传的是不是 ImportSelector 类型的类
+					 */
 					if (candidate.isAssignable(ImportSelector.class)) {
 						// Candidate class is an ImportSelector -> delegate to it to determine imports
 						Class<?> candidateClass = candidate.loadClass();
@@ -580,6 +587,18 @@ class ConfigurationClassParser {
 							processImports(configClass, currentSourceClass, importSourceClasses, exclusionFilter, false);
 						}
 					}
+					/**
+					 * 判断@Import里面传的是不是 ImportBeanDefinitionRegistrar 类。这个类非常牛逼。一定要学会理解！！
+					 * 这个 ImportBeanDefinitionRegistrar 可以动态的往bdMap里面添加一个bd。这个接口也可以参与bean工厂的建设
+					 * 有多种方法可以往bdMap里面添加bd
+					 * 	1 手动调用AnnotationConfigApplicationContext gister()   这里需要的是一个类        注意：一个类变成bd的过程是我们没有办法参与的
+					 * 	2 手动调用AnnotationConfigApplicationContext scan()	   这里也是需要的是一个类    注意：一个类变成bd的过程是我们没有办法参与的
+					 * 	3 通过实现 ImportBeanDefinitionRegistrar 接口		   这个就可以参与到变成bd的过程中去
+					 * 		可以参与有什么好处呢？
+					 * 		最佳实践：@MapperScan()的原理是什么？
+					 * 			扫描mapper，说白了就是把我们的接口变成了一个对象，而且最牛逼的就是这个对象在SpringIoc中
+					 *
+					 */
 					else if (candidate.isAssignable(ImportBeanDefinitionRegistrar.class)) {
 						// Candidate class is an ImportBeanDefinitionRegistrar ->
 						// delegate to it to register additional bean definitions
@@ -589,6 +608,9 @@ class ConfigurationClassParser {
 										this.environment, this.resourceLoader, this.registry);
 						configClass.addImportBeanDefinitionRegistrar(registrar, currentSourceClass.getMetadata());
 					}
+					/**
+					 * 判断@Import 里面传的是不是普通类
+					 */
 					else {
 						// Candidate class not an ImportSelector or ImportBeanDefinitionRegistrar ->
 						// process it as an @Configuration class
