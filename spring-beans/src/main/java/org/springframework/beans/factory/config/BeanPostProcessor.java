@@ -89,6 +89,9 @@ public interface BeanPostProcessor {
 
 	/**
 	 * 在bean初始化之前执行，也就是在 init 方法执行之前
+	 * 		经典场景：
+	 * 			1 CommonAnnotationBeanPostProcessor#PostConstruct和PreDestroy，插手spring的生命周期
+	 * 			2 AOP -- AbstractAutoProxyCreator
 	 * Apply this {@code BeanPostProcessor} to the given new bean instance <i>before</i> any bean
 	 * initialization callbacks (like InitializingBean's {@code afterPropertiesSet}
 	 * or a custom init-method). The bean will already be populated with property values.

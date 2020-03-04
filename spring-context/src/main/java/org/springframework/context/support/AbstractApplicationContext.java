@@ -516,10 +516,24 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				 * 设置执行自定义的ProcessBeanFactory 和 spring自己内部定义的
 				 * 如果这里我们没有写实现 BeanFactoryPostProcessors 接口的类，那么执行的就只有一个，就是之前放到bean工厂map中
 				 * 的 ConfigurationClassPostProcessor 里面的方法
+				 *
+				 * 非常非常重要！！ 里面做了很多很多必须处理的事
 				 */
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
+				/**
+				 * 注册 BeanPostProcessors
+				 *
+				 * spring中的 BeanPostProcessors 为什么要注册？
+				 * 	先大致看一下bean的过程：beanDefinition --> bean -->实例化 --> beanPostProcessor -->init -->property
+				 * 	当实例化的时候，需要经过 beanPostProcessor ,这个处理器我们之前知道，它是一个list，这个list维护在spring内部，
+				 * 	所以要把 beanPostProcessor 注册给它。因为他是一个 list 所以我们可以自己添加，spring 内部也有。
+				 *
+				 * 因为spring内部有成千上百个 beanPostProcessor,它要决定这个时候要使用哪个，把它放到一个此时需要用到一个list里面，所以这个时候才需要注册。
+				 *
+				 * 这个地方就是来注册 spring 内部的一些 BeanPostProcessors 后置处理器
+				 */
 				registerBeanPostProcessors(beanFactory);
 
 				// Initialize message source for this context.

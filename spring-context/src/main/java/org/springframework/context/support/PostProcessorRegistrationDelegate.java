@@ -117,9 +117,10 @@ final class PostProcessorRegistrationDelegate {
 			 *
 			 */
 			invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);
+			//到此为止，BeanDefinitionRegistryPostProcessor也就是实现了它的ConfigurationClassPostProcessor的postProcessBeanDefinitionRegistry 回调方法就全部执行完了。非常非常重要--------------------
 			currentRegistryProcessors.clear();
 
-			// Next, invoke the BeanDefinitionRegistryPostProcessors that implement Ordered.
+			// Next, invoke the BeanDefinitionRegistryPostProcessors that implement Ordered.  不重要
 			postProcessorNames = beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, true, false);
 			for (String ppName : postProcessorNames) {
 				if (!processedBeans.contains(ppName) && beanFactory.isTypeMatch(ppName, Ordered.class)) {
@@ -132,7 +133,7 @@ final class PostProcessorRegistrationDelegate {
 			invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);
 			currentRegistryProcessors.clear();
 
-			// Finally, invoke all other BeanDefinitionRegistryPostProcessors until no further ones appear.
+			// Finally, invoke all other BeanDefinitionRegistryPostProcessors until no further ones appear.  不重要
 			boolean reiterate = true;
 			while (reiterate) {
 				reiterate = false;
@@ -151,7 +152,15 @@ final class PostProcessorRegistrationDelegate {
 			}
 
 			// Now, invoke the postProcessBeanFactory callback of all processors handled so far.
+			/**
+			 * 执行 BeanFactoryPostProcessors 的回调，前面不是执行过了吗？
+			 * 		前面执行的是 BeanFactoryPostProcessors 的子类 BeanDefinitionRegistryPostProcessors 的回调方法！！
+			 * 		从这里开始执行 BeanFactoryPostProcessors 的回调方法！！
+			 */
 			invokeBeanFactoryPostProcessors(registryProcessors, beanFactory);
+			/**
+			 * 处理自定义的 BeanFactoryPostProcessors
+			 */
 			invokeBeanFactoryPostProcessors(regularPostProcessors, beanFactory);
 		}
 
@@ -211,7 +220,15 @@ final class PostProcessorRegistrationDelegate {
 
 	public static void registerBeanPostProcessors(
 			ConfigurableListableBeanFactory beanFactory, AbstractApplicationContext applicationContext) {
-
+		/**
+		 * 从 beanDefinitionMap 中得到所有的 BeanPostProcessor
+		 * 初始化环境是这里有三个 BeanPostProcessor：
+		 * 1 ApplicationContextAwareProcessor
+		 * 2 ApplicationListenerDetector
+		 * 上面的这两个是在 AbstractApplicationContext 的 refresh() 的 prepareRefresh() 时传进来的
+		 * 3 ConfigurationClassPostProcessor$ImportAwareBeanPostProcessor 是 ConfigurationClassPostProcessor 的内部类，是在 cglib 动态代理那块添加进来的。
+		 * 	这个非常重要!! 移步 ImportAwareBeanPostProcessor 中
+		 */
 		String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
 
 		// Register BeanPostProcessorChecker that logs an info message when
@@ -275,6 +292,10 @@ final class PostProcessorRegistrationDelegate {
 
 		// Re-register post-processor for detecting inner beans as ApplicationListeners,
 		// moving it to the end of the processor chain (for picking up proxies etc).
+		/**
+		 * 到这里，就多出来了四个（这里值的是spring内部的，当然我们如果也实现了 beanPostProcessor也会放到list里面）
+		 * 不带我们自己写的，此时有6个，每一个都有它的特殊功能。都学要学会
+		 */
 		beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
 	}
 
@@ -333,6 +354,11 @@ final class PostProcessorRegistrationDelegate {
 	 * BeanPostProcessor that logs an info message when a bean is created during
 	 * BeanPostProcessor instantiation, i.e. when a bean is not eligible for
 	 * getting processed by all BeanPostProcessors.
+	 *
+	 * 首先，这个类并不重要。
+	 * 作用：当spring配置的后置处理器还没有被注册就已经开始了bean的初始化，变会打印出 BeanPostProcessorChecker 中设定的信息
+	 *
+	 * 就是用来检查spring中的bean有没有执行后置处理器，如果没有执行就会打印一行信息
 	 */
 	private static final class BeanPostProcessorChecker implements BeanPostProcessor {
 

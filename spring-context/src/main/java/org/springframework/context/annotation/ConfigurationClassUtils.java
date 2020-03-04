@@ -143,7 +143,8 @@ abstract class ConfigurationClassUtils {
 		/**
 		 * 判断 config 中的AnnotationAttributes中的key -- proxyBeanMethods 对应的不等于false，则为bd设置configurationClass属性为full
 		 *
-		 * todo 没看明白 按道理应该是和判断是不是有@Configutation有关
+		 * todo 没看明白 按道理应该是和判断是不是有@Configutation有关 。如果加了 @Configutation 就为bd设置configurationClass属性为full
+		 * 如果存在 @Configutation spring则认为这是一个全注解的类
 		 */
 		if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);
@@ -156,6 +157,7 @@ abstract class ConfigurationClassUtils {
 	     * candidateIndicators.add(ImportResource.class.getName());
 		 *
 		 * 这里会判断这些bd是否是加了@Component，@ComponentScan，@Import，@ImportResource注解，如果是，则为bd设置configurationClass属性为lite
+		 * 如果不存在 @Configutation 注解，spring则认为是一个部分注解类
 		 */
 		else if (config != null || isConfigurationCandidate(metadata)) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);

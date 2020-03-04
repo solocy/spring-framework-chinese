@@ -243,7 +243,15 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			// Simply call processConfigurationClasses lazily at this point then.
 			processConfigBeanDefinitions((BeanDefinitionRegistry) beanFactory);
 		}
-
+		/**
+		 * 产生cglib代理 -- 为什么需要产生cglib代理？ spring中最难的一块呼啸而来！！
+		 * 剧透：这里跟Full（全注解）和Lite有关。
+		 * 		如果是Full那么这个enhanceConfigurationClasses方法是可以启动它应该起的作用的，
+		 * 		如果是Lite那么这个方法虽然会进，但是有给踢出来了。相当于这个方法对它是不起作用的。
+		 * 			那么这个方法有什么妙用呢？进去看看就知道了！！
+		 *
+		 * 说白了。如果是Full也就是加了@Configuration则会进行cglib的代理，如果是Lite没有加则不会进行cglib 的代理。		！！！！
+		 */
 		enhanceConfigurationClasses(beanFactory);
 		beanFactory.addBeanPostProcessor(new ImportAwareBeanPostProcessor(beanFactory));
 	}
@@ -259,6 +267,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		 */
 		String[] candidateNames = registry.getBeanDefinitionNames();
 
+		/**
+		 * Full  加了@Configuration 则为Full
+		 * Lite  没有加但是加了 @Configuration,@Component，@ComponentScan，@Import，@ImportResource 则设置为Lite
+		 *
+		 */
 		for (String beanName : candidateNames) {
 			BeanDefinition beanDef = registry.getBeanDefinition(beanName);
 			/**
@@ -270,7 +283,15 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 					logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
 				}
 			}
-			//这里会依次拿出来所有的bd，然后判断是否包含了@Configuration,@Component，@ComponentScan，@Import，@ImportResource等注解，如果加了则返回true
+			/**
+			 * 判断是否是 Configuration类，如果加了 Configuration 下面的这几个注解就不再判断了
+			 *
+			 * 这里会依次拿出来所有的bd，然后判断是否包含了@Configuration,@Component，@ComponentScan，@Import，@ImportResource等注解，如果加了则返回true
+			 *
+			 * 这里不管是加了 @Configuration 还是 @Configuration,@Component，@ComponentScan，@Import，@ImportResource 都会返回true，
+			 * 只是，如果加了 @Configuration 会为这个bd设置configurationClass属性为Full,否则的话设置为Lite。
+			 * 然后都会把这个bd加到configCandidates，然后进行解析
+			 */
 			else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
 				configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
 			}
@@ -299,7 +320,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		 */
 		if (registry instanceof SingletonBeanRegistry) {
 			sbr = (SingletonBeanRegistry) registry;
-			if (!this.localBeanNameGeneratorSet) {//是否是自定义的。如果不是，则用spring自己提供的，beanName的生成器，使用默认的
+			if (!this.localBeanNameGeneratorSet) {//是否是自定义的。如果不是，则用spring自己提供的beanName的生成器
 				BeanNameGenerator generator = (BeanNameGenerator) sbr.getSingleton(
 						AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR);
 				if (generator != null) {
@@ -315,14 +336,13 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 		// Parse each @Configuration class
 		/**
-		 * ConfigurationClassParser 用来解析各个配置类
-		 *
+		 * 实例化 ConfigurationClassParser 用来解析各个配置类
 		 */
 		ConfigurationClassParser parser = new ConfigurationClassParser(
 				this.metadataReaderFactory, this.problemReporter, this.environment,
 				this.resourceLoader, this.componentScanBeanNameGenerator, registry);
 		/**
-		 * 定义 Set<BeanDefinitionHolder> 主要是为了去重。
+		 * 再定义一个 Set<BeanDefinitionHolder> 主要是为了去重。
 		 */
 		Set<BeanDefinitionHolder> candidates = new LinkedHashSet<>(configCandidates);
 		/**
@@ -331,6 +351,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		Set<ConfigurationClass> alreadyParsed = new HashSet<>(configCandidates.size());
 		do {
 			/**
+			 * 非常重要！！！ springbean工厂最核心的功能代码之一
 			 * 这个就是用来扫描包的。
 			 * 这行代码执行完，我们自己写的加了注解的类，就会放到bean工厂的bdMap中去
 			 */
@@ -338,6 +359,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 			parser.validate();
 
+			/**
+			 * 这里拿到所有的类（包括已经注册到bd中的普通类，和还没有放到bdmap中的属于ImportSelector的类）
+			 */
 			Set<ConfigurationClass> configClasses = new LinkedHashSet<>(parser.getConfigurationClasses());
 			configClasses.removeAll(alreadyParsed);
 
@@ -347,6 +371,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
+			/**
+			 * 非常重要！！
+			 * 在这里把 configClasses 传进去，调用 loadBeanDefinitions 方法，这个方法就可以把属于ImportSelector和ImportBeanDefinitionRegistrar的类，
+			 * 放到bean工厂的bdMap中了
+			 */
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);
 
@@ -413,6 +442,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 					}
 				}
 			}
+			//判断是不是一个全注解类
 			if (ConfigurationClassUtils.CONFIGURATION_CLASS_FULL.equals(configClassAttr)) {
 				if (!(beanDef instanceof AbstractBeanDefinition)) {
 					throw new BeanDefinitionStoreException("Cannot enhance @Configuration bean definition '" +
@@ -427,6 +457,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				configBeanDefs.put(beanName, (AbstractBeanDefinition) beanDef);
 			}
 		}
+		/**
+		 * 代码执行到这里就一目了然了，如果不是全注解，则会直接return出去。其实就是相当于这整个方法都没用
+		 */
 		if (configBeanDefs.isEmpty()) {
 			// nothing to enhance -> return immediately
 			return;
@@ -439,6 +472,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			beanDef.setAttribute(AutoProxyUtils.PRESERVE_TARGET_CLASS_ATTRIBUTE, Boolean.TRUE);
 			// Set enhanced subclass of the user-specified bean class
 			Class<?> configClass = beanDef.getBeanClass();
+			/**
+			 * 完成对全注解类的cglib代理
+			 */
 			Class<?> enhancedClass = enhancer.enhance(configClass, this.beanClassLoader);
 			if (configClass != enhancedClass) {
 				if (logger.isTraceEnabled()) {
@@ -471,6 +507,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 		@Override
 		public Object postProcessBeforeInitialization(Object bean, String beanName) {
+			/**
+			 * ImportAware 的作用及用法
+			 * ImportAware 这个接口可以得到spring当中所有类的注解，然后获取这些值。
+			 * 请看示例：
+			 */
 			if (bean instanceof ImportAware) {
 				ImportRegistry ir = this.beanFactory.getBean(IMPORT_REGISTRY_BEAN_NAME, ImportRegistry.class);
 				AnnotationMetadata importingClass = ir.getImportingClassFor(ClassUtils.getUserClass(bean).getName());

@@ -65,14 +65,21 @@ class ComponentScanAnnotationParser {
 
 
 	public Set<BeanDefinitionHolder> parse(AnnotationAttributes componentScan, final String declaringClass) {
+		/**
+		 * spring在这里又new了一个 ClassPathBeanDefinitionScanner 并不是使用的 AnnotationConfigApplicationContext 初始化时候new的那个扫描器。
+		 */
 		ClassPathBeanDefinitionScanner scanner = new ClassPathBeanDefinitionScanner(this.registry,
 				componentScan.getBoolean("useDefaultFilters"), this.environment, this.resourceLoader);
 
+		// BeanNameGenerator beanName的生成器
 		Class<? extends BeanNameGenerator> generatorClass = componentScan.getClass("nameGenerator");
 		boolean useInheritedGenerator = (BeanNameGenerator.class == generatorClass);
 		scanner.setBeanNameGenerator(useInheritedGenerator ? this.beanNameGenerator :
 				BeanUtils.instantiateClass(generatorClass));
 
+		/**
+		 * ScopedProxyMode 非常重要，web中再来说
+		 */
 		ScopedProxyMode scopedProxyMode = componentScan.getEnum("scopedProxy");
 		if (scopedProxyMode != ScopedProxyMode.DEFAULT) {
 			scanner.setScopedProxyMode(scopedProxyMode);
@@ -84,6 +91,9 @@ class ComponentScanAnnotationParser {
 
 		scanner.setResourcePattern(componentScan.getString("resourcePattern"));
 
+		/**
+		 * 遍历过滤器
+		 */
 		for (AnnotationAttributes filter : componentScan.getAnnotationArray("includeFilters")) {
 			for (TypeFilter typeFilter : typeFiltersFor(filter)) {
 				scanner.addIncludeFilter(typeFilter);
@@ -95,6 +105,7 @@ class ComponentScanAnnotationParser {
 			}
 		}
 
+		// 默认都不是懒加载，如果我们设置的为true，则这里给它设置为true
 		boolean lazyInit = componentScan.getBoolean("lazyInit");
 		if (lazyInit) {
 			scanner.getBeanDefinitionDefaults().setLazyInit(true);
@@ -120,7 +131,9 @@ class ComponentScanAnnotationParser {
 				return declaringClass.equals(className);
 			}
 		});
-		//上面的可以粗略的看一下，这里才是最重要的，就是在这个 doScan方法中执行扫描的  点进来看！！
+		/**
+		 * 上面的可以粗略的看一下，这里才是最重要的，就是在这个 doScan方法中执行扫描的  点进来看！！
+		 */
 		return scanner.doScan(StringUtils.toStringArray(basePackages));
 	}
 

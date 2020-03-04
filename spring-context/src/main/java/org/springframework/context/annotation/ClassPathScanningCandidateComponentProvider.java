@@ -410,7 +410,9 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 		try {
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
+			// 用asm 读取class文件。asm很牛逼，但是又很难。spring的cglib就是通过asm技术实现的动态代理
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
+
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
 			for (Resource resource : resources) {
@@ -421,7 +423,11 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 					try {
 						MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
 						if (isCandidateComponent(metadataReader)) {
-
+							/**
+							 * 注意这里new的是 ScannedGenericBeanDefinition
+							 * 通过查看 ScannedGenericBeanDefinition 的树结构，可以看出来他 继承了 GenericBeanDefinition extends AbstractBeanDefinition
+							 * 															 并且 implements AnnotatedBeanDefinition
+							 */
 							ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 							sbd.setResource(resource);
 							sbd.setSource(resource);

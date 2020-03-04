@@ -57,6 +57,8 @@ import org.springframework.core.type.AnnotationMetadata;
  * @see Import
  * @see ImportSelector
  * @see Configuration
+ *
+ * 可以动态改变bd。这个类在第三方框架或者是其他地方无处不在。
  */
 public interface ImportBeanDefinitionRegistrar {
 

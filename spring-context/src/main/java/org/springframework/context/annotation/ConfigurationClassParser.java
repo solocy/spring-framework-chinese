@@ -145,6 +145,7 @@ class ConfigurationClassParser {
 
 
 	public void parse(Set<BeanDefinitionHolder> configCandidates) {
+		//根据 BeanDefinition 的类型做不同的处理，一般都会调用 ConfigurationClassParser#parse方法
 		for (BeanDefinitionHolder holder : configCandidates) {
 			BeanDefinition bd = holder.getBeanDefinition();
 			try {
@@ -201,7 +202,12 @@ class ConfigurationClassParser {
 		return this.configurationClasses.keySet();
 	}
 
-
+	/**
+	 * ConfigurationClass 只是一个数据结构，此时我们就可以认为这个是我们自定定义的配置类 AppConfig
+	 * @param configClass
+	 * @param filter
+	 * @throws IOException
+	 */
 	protected void processConfigurationClass(ConfigurationClass configClass, Predicate<String> filter) throws IOException {
 		//这里肯定不会跳过解析，接着往下看
 		if (this.conditionEvaluator.shouldSkip(configClass.getMetadata(), ConfigurationPhase.PARSE_CONFIGURATION)) {
@@ -210,6 +216,8 @@ class ConfigurationClassParser {
 
 		/**
 		 * 处理Imported 的情况
+		 * 什么是Imported？ 就是当前这个注解类有没有被别的类Import
+		 * 这段代码并不重要，因为我们很少这样用
 		 */
 		ConfigurationClass existingClass = this.configurationClasses.get(configClass);
 		if (existingClass != null) {
@@ -229,15 +237,21 @@ class ConfigurationClassParser {
 		}
 
 		// Recursively process the configuration class and its superclass hierarchy.
+		/**
+		 * 如果对编码比较了解就知道这个就只是一个类转换而已  可以理解为 user --> userVO
+		 */
 		SourceClass sourceClass = asSourceClass(configClass, filter);
 		do {
 			/**
-			 * 最重要的是这个方法
+			 * 最重要的是这个方法！！
 			 */
 			sourceClass = doProcessConfigurationClass(configClass, sourceClass, filter);
 		}
 		while (sourceClass != null);
 
+		/**
+		 * 一个map，用来存放扫描出来的bean（注意这里的bean并不是对象，仅仅是bean的信息，因为还没到实例化的时候）
+		 */
 		this.configurationClasses.put(configClass, configClass);
 	}
 
@@ -261,7 +275,10 @@ class ConfigurationClassParser {
 		}
 
 		// Process any @PropertySource annotations
-		// 处理加了 @PropertySource 的注解
+		/**
+		 * 处理加了 @PropertySource 的注解
+		 * 		使用方式：我们写的property文件，我们可以通过@PropertySource注解的方式，把它引用过来
+ 		 */
 		for (AnnotationAttributes propertySource : AnnotationConfigUtils.attributesForRepeatable(
 				sourceClass.getMetadata(), PropertySources.class,
 				org.springframework.context.annotation.PropertySource.class)) {
@@ -275,7 +292,9 @@ class ConfigurationClassParser {
 		}
 
 		// Process any @ComponentScan annotations
-		// 处理加了 @ComponentScan 的注解
+		/**
+		 * 处理所有加了 @ComponentScan 的注解
+ 		 */
 		Set<AnnotationAttributes> componentScans = AnnotationConfigUtils.attributesForRepeatable(
 				sourceClass.getMetadata(), ComponentScans.class, ComponentScan.class);
 		if (!componentScans.isEmpty() &&
@@ -283,13 +302,17 @@ class ConfigurationClassParser {
 			for (AnnotationAttributes componentScan : componentScans) {
 				// The config class is annotated with @ComponentScan -> perform the scan immediately
 				/**
+				 * 扫描普通类，那么何为普通类，何为不普通类？
+				 * 	普通类：加了@Component、@service、@dao、@controller的类
+				 *
 				 * 这里的parse方法是最重要的！！这里是在递归处理，最终还是进入到了这个parse方法  点进去看！！
 				 * 也就是在这个parse方法里面，把我们扫描出来的加了注解的类放到了bean工厂的map里面了
 				 *
-				 * 这里就能把我们定义的加了注解的类扫描出来
+				 * 这里就能把我们定义的加了@Component、@service、@dao、@controller注解的类扫描出来
  				 */
 				Set<BeanDefinitionHolder> scannedBeanDefinitions =
 						this.componentScanParser.parse(componentScan, sourceClass.getMetadata().getClassName());
+
 				// Check the set of scanned definitions for any further config classes and parse recursively if needed
 				// 检查扫描出来的类当中是否还有 configuration
 				for (BeanDefinitionHolder holder : scannedBeanDefinitions) {
@@ -304,9 +327,15 @@ class ConfigurationClassParser {
 			}
 		}
 
+		/**
+		 * 上面的代码就是扫描普通类---@Component。并且随机就放到beanMap中了
+		 *
+		 */
+
 		// Process any @Import annotations
 		/**
-		 * 处理 @Import 这个也很重要
+		 * 处理 @Import 非常重要
+		 *
 		 */
 		processImports(configClass, sourceClass, getImports(sourceClass), filter, true);
 
@@ -572,18 +601,21 @@ class ConfigurationClassParser {
 					if (candidate.isAssignable(ImportSelector.class)) {
 						// Candidate class is an ImportSelector -> delegate to it to determine imports
 						Class<?> candidateClass = candidate.loadClass();
+						// 反射实例化一个对象
 						ImportSelector selector = ParserStrategyUtils.instantiateClass(candidateClass, ImportSelector.class,
 								this.environment, this.resourceLoader, this.registry);
 						Predicate<String> selectorFilter = selector.getExclusionFilter();
 						if (selectorFilter != null) {
 							exclusionFilter = exclusionFilter.or(selectorFilter);
 						}
+						// 这里并不会进
 						if (selector instanceof DeferredImportSelector) {
 							this.deferredImportSelectorHandler.handle(configClass, (DeferredImportSelector) selector);
 						}
 						else {
 							String[] importClassNames = selector.selectImports(currentSourceClass.getMetadata());
 							Collection<SourceClass> importSourceClasses = asSourceClasses(importClassNames, exclusionFilter);
+							//递归处理（然后判断importSourceClasses是不是还是属于ImportSelector类型如果不是则会直接走到下面的else代码块中）
 							processImports(configClass, currentSourceClass, importSourceClasses, exclusionFilter, false);
 						}
 					}
@@ -606,16 +638,26 @@ class ConfigurationClassParser {
 						ImportBeanDefinitionRegistrar registrar =
 								ParserStrategyUtils.instantiateClass(candidateClass, ImportBeanDefinitionRegistrar.class,
 										this.environment, this.resourceLoader, this.registry);
+						/**
+						 * 注意！！：这里的处理方式和 ImportSelector 不同。
+						 * ImportSelector 是把 configClass 放到了一个叫 configurationClasses 的Map中去了。
+						 * ImportBeanDefinitionRegistrar类型的是把 configClass 放到一个叫 importBeanDefinitionRegistrars 的Map中去了
+						 */
 						configClass.addImportBeanDefinitionRegistrar(registrar, currentSourceClass.getMetadata());
 					}
 					/**
-					 * 判断@Import 里面传的是不是普通类
+					 * 判断@Import 里面传的是不是普通类。最终是到这里来处理的
 					 */
 					else {
 						// Candidate class not an ImportSelector or ImportBeanDefinitionRegistrar ->
 						// process it as an @Configuration class
 						this.importStack.registerImport(
 								currentSourceClass.getMetadata(), candidate.getMetadata().getClassName());
+						/**
+						 * processConfigurationClass方法里面主要就是把类放到 configurationClasses 集合中去，会在后面拿出来解析成bd继而注册到bean工厂的map中
+						 * 从这里我们已经知悉--普通类在扫描出来的时候就被注册了，如果是importSelector 则会先放到configurationClasses集合中后面再进行注册。
+						 * 注意两者的区别
+						 */
 						processConfigurationClass(candidate.asConfigClass(configClass), exclusionFilter);
 					}
 				}

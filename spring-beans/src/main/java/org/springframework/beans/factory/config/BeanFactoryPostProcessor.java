@@ -25,6 +25,7 @@ import org.springframework.beans.BeansException;
  * 并可以根据需要进行修改，例如可以把bean的scope从singleton改为prototype，也可以把property的值给修改
  * 可以同时配置多个BeanFactoryPostProcessor，并通过设置‘order’尚需经来控制各个BeanFactoryPostProcessor
  * 可以写一个例子来测试一下这个功能
+ * 		经典场景：ConfigurationClassPostProcessor#postProcessBeanFactory 给配置类加上cglib代理。
  *
  * BeanFactoryPostProcessor 是在spring容器加载bean的定义文件之后，在bean实例化之前执行的
  * Factory hook that allows for custom modification of an application context's

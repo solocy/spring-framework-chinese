@@ -16,10 +16,10 @@
 
 package org.springframework.context.annotation;
 
-import java.util.function.Predicate;
-
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.lang.Nullable;
+
+import java.util.function.Predicate;
 
 /**
  * Interface to be implemented by types that determine which @{@link Configuration}
@@ -64,6 +64,9 @@ public interface ImportSelector {
 	 * Select and return the names of which class(es) should be imported based on
 	 * the {@link AnnotationMetadata} of the importing @{@link Configuration} class.
 	 * @return the class names, or an empty array if none
+	 * 从class --spring --> bd
+	 * 我们给什么class，spring就给我们什么bd。不能去动态改变bd。
+	 * 如果我们想要动态的改变bd，那么就要用另外一个接口了 --
 	 */
 	String[] selectImports(AnnotationMetadata importingClassMetadata);
 

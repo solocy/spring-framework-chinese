@@ -20,6 +20,11 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 
 /**
+ * ConfigurationClassPostProcessor 实现了这个接口，在源码中我们可以看到这个比他继承BeanFactoryPostProcessor里面的方法先执行。
+ * 还有就是执行自定义的（注意源码中的自定义，指的是我们手动调用add的那个方法添加上去的，而不是我们在类中加了@Component这样的）
+ * 自定义的先执行
+ * 		经典场景：ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry
+ *
  * Extension to the standard {@link BeanFactoryPostProcessor} SPI, allowing for
  * the registration of further bean definitions <i>before</i> regular
  * BeanFactoryPostProcessor detection kicks in. In particular,

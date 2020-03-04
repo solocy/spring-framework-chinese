@@ -10,12 +10,13 @@ import org.springframework.stereotype.Component;
  * @Description
  * @Date 2020/3/1 22:33
  * @Created by 亢丁
- * 实现PriorityOrdered接口，这个接口是用来控制bean实例化的顺序的
+ * 实现PriorityOrdered接口，这个接口是用来控制bean实例化的顺序的。此时bean已经实例化了，但是还没有放到IOC中。此时对这个bean进行
+ * 修改然后再放到IOC中。
  */
 @Component
 public class TestBeanPostProcessor implements BeanPostProcessor, PriorityOrdered {
 	/**
-	 * bean初始化之前执行
+	 * bean调用Init之前执行
 	 * @param bean 原始的bean，当然这里我们可以加工这个bean返回出去，那么就IOC里面存的就是加工后的bean了
 	 * @param beanName the name of the bean
 	 * @return
@@ -33,7 +34,7 @@ public class TestBeanPostProcessor implements BeanPostProcessor, PriorityOrdered
 	}
 
 	/**
-	 * bean初始化之后执行
+	 * bean调用init之后执行
 	 * @param bean the new bean instance
 	 * @param beanName the name of the bean
 	 * @return
