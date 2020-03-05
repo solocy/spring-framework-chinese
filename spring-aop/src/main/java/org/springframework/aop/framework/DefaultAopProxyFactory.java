@@ -16,10 +16,10 @@
 
 package org.springframework.aop.framework;
 
+import org.springframework.aop.SpringProxy;
+
 import java.io.Serializable;
 import java.lang.reflect.Proxy;
-
-import org.springframework.aop.SpringProxy;
 
 /**
  * Default {@link AopProxyFactory} implementation, creating either a CGLIB proxy
@@ -48,15 +48,27 @@ public class DefaultAopProxyFactory implements AopProxyFactory, Serializable {
 
 	@Override
 	public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
+		/**
+		 * if 条件里面的这个代码，非常非常关键
+		 * config.isOptimize() 这个我们可以通过xml的方式类配置，但是注解的方式还没有找到如何配置（后面再看看），默认是false。此时我们姑且认为这个值恒定是一个false
+		 * config.isProxyTargetClass() 这个值默认也是false，我们可以在开启AOP的注解上面配置
+		 * hasNoUserSuppliedProxyInterfaces(config) 也是恒定为false
+		 * 总结：此时我们姑且认为这里都是false，所以，此时会走下面的else，也就是最终返回的是 JdkDynamicAopProxy
+		 */
 		if (config.isOptimize() || config.isProxyTargetClass() || hasNoUserSuppliedProxyInterfaces(config)) {
 			Class<?> targetClass = config.getTargetClass();
+			//-- 当我们把这个config.isProxyTargetClass()设置为true，就会进来了。
 			if (targetClass == null) {
 				throw new AopConfigException("TargetSource cannot determine target class: " +
 						"Either an interface or a target is required for proxy creation.");
 			}
+			/**
+			 * 这里又做了判断，如果这个类有接口或者。。那么仍然创建为JDK动态代理
+			 */
 			if (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) {
 				return new JdkDynamicAopProxy(config);
 			}
+			// 这个是cglib的实现类
 			return new ObjenesisCglibAopProxy(config);
 		}
 		else {

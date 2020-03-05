@@ -16,26 +16,15 @@
 
 package org.springframework.beans.factory.support;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCreationNotAllowedException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.core.SimpleAliasRegistry;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic registry for shared bean instances, implementing the
@@ -71,12 +60,15 @@ import org.springframework.util.StringUtils;
 public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements SingletonBeanRegistry {
 
 	/** Cache of singleton objects: bean name to bean instance. */
+	// 用于存放完全初始化好的 bean 从该缓存中取出的 bean可以直接使用
 	private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
 
 	/** Cache of singleton factories: bean name to ObjectFactory. */
+	// 存放 bean 工厂对象解决循环依赖
 	private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
 
 	/** Cache of early singleton objects: bean name to bean instance. */
+	// 存放原始的bean对象用于解决循环依赖，注意：存到里面的对象还没有被填充属性
 	private final Map<String, Object> earlySingletonObjects = new HashMap<>(16);
 
 	/** Set of registered singletons, containing the bean names in registration order. */
@@ -150,7 +142,21 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	protected void addSingletonFactory(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(singletonFactory, "Singleton factory must not be null");
 		synchronized (this.singletonObjects) {
+			/**
+			 * singletonObjects 这个里面放的就是最终的对象也就是AOP里面存的对象。
+			 * 我们需要了解bean的三种状态
+			 * 	1 bean old 也就是bean的原生对象，就是刚new出来的对象，不存在在任何集合当中
+			 * 	  当刚new出来的对象会先往 singletonFactories （map） 里面放一份
+			 * 	2 放到了 earlySingletonObjects （map） 的对象，叫做 过渡对象 -- 已经new出来了，但是属性还没有填充
+			 * 	3 放到了 registeredSingletons （map） 的对象。
+			 *
+			 * 	当执行完这些操作后，跳出该方法，然后接着去执行上一步的操作！！
+			 */
 			if (!this.singletonObjects.containsKey(beanName)) {
+				/**
+				 * 下面的这三行代码，重要的无以复加！！！！！！
+				 * 跟spring的循环依赖有关，3个map+1个list
+				 */
 				this.singletonFactories.put(beanName, singletonFactory);
 				this.earlySingletonObjects.remove(beanName);
 				this.registeredSingletons.add(beanName);
@@ -174,6 +180,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+		/**
+		 * 从map中获取bean如果不为null直接返回，不再进行初始化工作
+		 * 讲道理一个程序员提供的对象这里一般都是为null 的
+		 */
 		Object singletonObject = this.singletonObjects.get(beanName);
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
 			synchronized (this.singletonObjects) {
@@ -202,7 +212,13 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
 		synchronized (this.singletonObjects) {
+			/**
+			 * 这里会再拿一遍，此时肯定是为null 的
+			 */
 			Object singletonObject = this.singletonObjects.get(beanName);
+			/**
+			 * 进入这个方法
+			 */
 			if (singletonObject == null) {
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
@@ -212,6 +228,9 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				/**
+				 * 将beanName添加到 SingletonsCurrentlyInCreation 这样一个set集合中，表示beanName对应的bean正在创建中
+				 */
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -219,6 +238,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					/**
+					 * 这里就创建出来了。我们可以看到，这里创建的对象竟然已经是一个代理对象。所以我们要往前追溯，看是什么时候这个已经创建好，而且如果加了AOP
+					 * 此时是以个代理对象。！！
+					 */
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}

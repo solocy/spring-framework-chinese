@@ -16,19 +16,8 @@
 
 package org.springframework.beans.factory.config;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Map;
-import java.util.Optional;
-
 import kotlin.reflect.KProperty;
 import kotlin.reflect.jvm.ReflectJvmMapping;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.InjectionPoint;
@@ -40,6 +29,16 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Descriptor for a specific dependency that is about to be injected.
@@ -272,7 +271,18 @@ public class DependencyDescriptor extends InjectionPoint implements Serializable
 	 */
 	public Object resolveCandidate(String beanName, Class<?> requiredType, BeanFactory beanFactory)
 			throws BeansException {
-
+		/**
+		 * 最终会在这里重新调用 getBean。此时如果是循环依赖问题，此时如果是x要拿另外一个类y，
+		 * 在拿y的时候，y有依赖了x（注意此时就产生循环依赖了）。（注意我们现在有一个前提，就是在这个一步操作之前，我们都已经把这个bean放到一个map中去了），
+		 * 此时x去拿y的时候，又会重新调用这个方法，但是因为x此时处于正在创建的状态，那么在getBean的时候，就会从这个map中去拿了。（就相当于中间多了一级，给解决了死疙瘩）
+		 * 此时，y就拿到x了，多以，y就成功赋值了，然后经历下面的一些操作（比如执行后置处理器啦，@PostConstruct啦），然后就成功创建了一个完整的对象。所以此时x去y
+		 * 就能拿到完整的y了，这个时候，x的y属性就赋值成功了。（虽然相互引用了，但是中间多了一个map，就解决了死循环的问题）。此时x再经历后面的一些处理（比如执行后置处理器啦，@PostConstruct啦）
+		 * 也成功创建了。
+		 *
+		 * 至此。循环依赖问题解决！！
+		 *
+		 * 此时会从 AbstractBeanFactory 调用 getBean 方法
+		 */
 		return beanFactory.getBean(beanName);
 	}
 

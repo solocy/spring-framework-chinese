@@ -16,38 +16,9 @@
 
 package org.springframework.beans.factory.support;
 
-import java.beans.ConstructorProperties;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
-
-import org.springframework.beans.BeanMetadataElement;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeanWrapperImpl;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.TypeConverter;
-import org.springframework.beans.TypeMismatchException;
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanDefinitionStoreException;
-import org.springframework.beans.factory.InjectionPoint;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
-import org.springframework.beans.factory.UnsatisfiedDependencyException;
+import org.springframework.beans.*;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.ConstructorArgumentValues;
 import org.springframework.beans.factory.config.ConstructorArgumentValues.ValueHolder;
@@ -57,12 +28,13 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.NamedThreadLocal;
 import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
-import org.springframework.util.MethodInvoker;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.ReflectionUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.util.*;
+
+import java.beans.ConstructorProperties;
+import java.lang.reflect.*;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.*;
 
 /**
  * Delegate for resolving constructors and factory methods.
@@ -124,21 +96,51 @@ class ConstructorResolver {
 	 */
 	public BeanWrapper autowireConstructor(String beanName, RootBeanDefinition mbd,
 			@Nullable Constructor<?>[] chosenCtors, @Nullable Object[] explicitArgs) {
-
+		/**
+		 * 实例一个 BeanWrapperImpl 对象--很好理解
+		 * 前面外部返回的 BeanWrapperImpl 其实就是这个 BeanWrapperImpl。因为 BeanWrapper 是一个接口
+		 * BeanWrapperImpl extends AbstractNestablePropertyAccessor 在 AbstractNestablePropertyAccessor 中有一个属性 wrappedObject 这个就是存的我们的真实对象的
+		 */
 		BeanWrapperImpl bw = new BeanWrapperImpl();
+		// 这个只是做了一些初始化的值--不太重要
 		this.beanFactory.initBeanWrapper(bw);
 
+		// 再次强调，这个 constructorToUse 就是用来记录，并最终确定是根据哪个构造方法来 new 对象的
 		Constructor<?> constructorToUse = null;
+		// 这个构造方法，需要哪些参数，在这里面定义。
+		// 这里肯定是没有值的，因为这个值是不确定的，但是也不是没有办法给，在模拟 mybatis 时，我们就用了一个通过构造方法的方式传递了值
 		ArgumentsHolder argsHolderToUse = null;
 		Object[] argsToUse = null;
 
+		/**
+		 * 我们想通过有参构造方法来new一个对象出来，要确定三个值
+		 * 1 Constructor
+		 * 2 paramsType
+		 * 3 parmasValue
+		 *
+		 * 那么接下来我们要做的事情，就是确定这三个值，然后判断根据哪个有参构造器，然后new出来对象
+ 		 */
+
+
+		/**
+		 * 确定参数值列表
+		 * argsToUse 可以有两种办法设置
+		 * 	1 通过 beanDefinition 设置
+		 * 	2 通过 xml 设置
+		 */
 		if (explicitArgs != null) {
 			argsToUse = explicitArgs;
 		}
 		else {
+			// 参数转换
 			Object[] argsToResolve = null;
 			synchronized (mbd.constructorArgumentLock) {
+				/**
+				 * 获取已解析的构造方法
+				 * 一般不会有，因为构造方法一般会提供一个，除非有多个，那么才会存在已经解析完成的构造方法
+				 */
 				constructorToUse = (Constructor<?>) mbd.resolvedConstructorOrFactoryMethod;
+				// 这里99%的可能为null，所以不用太在意
 				if (constructorToUse != null && mbd.constructorArgumentsResolved) {
 					// Found a cached constructor...
 					argsToUse = mbd.resolvedConstructorArguments;
@@ -147,6 +149,7 @@ class ConstructorResolver {
 					}
 				}
 			}
+			// 这个也是99%为null，因为我们参数都不确定
 			if (argsToResolve != null) {
 				argsToUse = resolvePreparedArguments(beanName, mbd, bw, constructorToUse, argsToResolve, true);
 			}
@@ -182,34 +185,85 @@ class ConstructorResolver {
 			}
 
 			// Need to resolve the constructor.
+			/**
+			 * 如果没有已经解析的构造方法，则需要去解析构造方法
+			 * 判断构造方法是否为空，判断是否根据构造方法自动注入
+			 *
+			 * 这里肯定为true
+			 */
 			boolean autowiring = (chosenCtors != null ||
 					mbd.getResolvedAutowireMode() == AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR);
 			ConstructorArgumentValues resolvedValues = null;
 
+			/**
+			 * 定义了最小参数个数
+			 * 如果你给构造方法的参数列表给定了具体的值，那么这些值的个数就是构造方法参数的个数
+			 */
 			int minNrOfArgs;
 			if (explicitArgs != null) {
 				minNrOfArgs = explicitArgs.length;
 			}
 			else {
+				/**
+				 * 实例一个对象，用来存放构造方法的参数值
+				 * 当中主要存放了参数值和参数值所对应的下标
+				 *
+				 * mbd.getConstructorArgumentValues().addGenericArgumentValue("111"); 这里拿到的其实就是我们在这里给的值。如果我们不这么写，这里拿到的 cargs 就是null
+				 */
 				ConstructorArgumentValues cargs = mbd.getConstructorArgumentValues();
 				resolvedValues = new ConstructorArgumentValues();
+				/**
+				 *
+				 * 在通过spring内部给了一个值的情况下，那么表示你的构造方法的最小参数一定为1,如果没给，那么就为0
+				 * mbd.getConstructorArgumentValues().addGenericArgumentValue("111"); 就是这个意思，如果这里给了参数值，就表示，这个构造方法参数肯定至少为1，
+				 * 要不然怎么传递过去赋值呢？就是给几个，这个 minNrOfArgs 就是几个
+				 */
 				minNrOfArgs = resolveConstructorArguments(beanName, mbd, bw, cargs, resolvedValues);
 			}
 
+			/**
+			 * 排序，这里为什么要排序？
+			 *	这里的排序规则是：先访问权限优先，继而是参数个数（多的排到前面）
+			 */
 			AutowireUtils.sortConstructors(candidates);
+			/**
+			 * 定义一个差异变量，这个变量很有分量，后面有注释。  这个变量是spring中最牛逼的变量！！！
+			 */
 			int minTypeDiffWeight = Integer.MAX_VALUE;
+			/**
+			 * 这里存的是，会有歧义的构造方法。
+			 * 为什么spring要定义这么一个变量？
+			 *
+			 */
 			Set<Constructor<?>> ambiguousConstructors = null;
 			LinkedList<UnsatisfiedDependencyException> causes = null;
 
+			/**
+			 * 循环所有的构造方法
+			 */
 			for (Constructor<?> candidate : candidates) {
 
 				int parameterCount = candidate.getParameterCount();
-
+				/**
+				 * 这个判断别看只有一行代码，理解起来很费劲
+				 * constructorToUse != null 很好理解，前面已经说过首先 constructorToUse 主要是用来装已经解析过了并且在使用的构造方法
+				 * 只有在他等于null的情况下，才有继续的意义，因为下面如果解析了一个符合的构造方法，就会赋值给这个变量（下面注释有写）。
+				 * 故而如果这个变量不等于null就不需要再进行解析了，找到一个合适的构造方法，直接使用便可以了
+				 *
+				 * argsToUse.length > parameterCount 这个代码就相当复杂了
+				 * 首先假设 argsToUse.length = [q,"coding",obj]
+				 * 那么会匹配到上面的构造方法的1和5
+				 * 由于构造方法1有更高的访问权限，所以选择1，尽管5看起来更加匹配
+				 * 但是我们看2，参数不对所以直接忽略
+				 */
 				if (constructorToUse != null && argsToUse != null && argsToUse.length > parameterCount) {
 					// Already found greedy constructor that can be satisfied ->
 					// do not look any further, there are only less greedy constructors left.
 					break;
 				}
+				/**
+				 * 这里就根据 minNrOfArgs 判断，如果 parameterCount 小于 minNrOfArgs ，那么肯定不符合，continue，继续循环
+				 */
 				if (parameterCount < minNrOfArgs) {
 					continue;
 				}
@@ -218,13 +272,30 @@ class ConstructorResolver {
 				Class<?>[] paramTypes = candidate.getParameterTypes();
 				if (resolvedValues != null) {
 					try {
+						/**
+						 * 判断构造方法上是否加了 ConstructorProperties 注解，如果加了则把值取出来
+						 * . @ConstructorProperties(value={"xxx","bbb"})
+						 * 这里不重要，因为我们很少这样用！
+						 */
 						String[] paramNames = ConstructorPropertiesChecker.evaluate(candidate, parameterCount);
 						if (paramNames == null) {
 							ParameterNameDiscoverer pnd = this.beanFactory.getParameterNameDiscoverer();
 							if (pnd != null) {
+								/**
+								 * 获取构造参数名字列表
+								 * 假如此时构造参数为：(String coding,Object pengze)
+								 * 则 paramNames=[coding,pengze]
+ 								 */
 								paramNames = pnd.getParameterNames(candidate);
 							}
 						}
+						/**
+						 * 这个方法比较复杂
+						 * 因为spring只能提供字符串的参数值，故而需要进行转换 argsHolder 所包含的值就是转换之后的。
+						 *
+						 * mybatis就利用到了这点。因为mybatis就是通过 mbd.getConstructorArgumentValues().addGenericArgumentValue("com.coding.xxx.xx");
+						 * 然后，就可以通过 argsHolder 把这个字符串转换成一个类。
+						 */
 						argsHolder = createArgumentArray(beanName, mbd, resolvedValues, bw, paramTypes, paramNames,
 								getUserDeclaredConstructor(candidate), autowiring, candidates.length == 1);
 					}
@@ -247,10 +318,13 @@ class ConstructorResolver {
 					}
 					argsHolder = new ArgumentsHolder(explicitArgs);
 				}
-
+				//----------从这里开始根据差异值进行最佳构造方法匹配
 				int typeDiffWeight = (mbd.isLenientConstructorResolution() ?
 						argsHolder.getTypeDifferenceWeight(paramTypes) : argsHolder.getAssignabilityWeight(paramTypes));
 				// Choose this constructor if it represents the closest match.
+				/**
+				 * 第一遍这个if一定会进，因为 minTypeDiffWeight 初始化时是最大的
+				 */
 				if (typeDiffWeight < minTypeDiffWeight) {
 					constructorToUse = candidate;
 					argsHolderToUse = argsHolder;
@@ -266,7 +340,7 @@ class ConstructorResolver {
 					ambiguousConstructors.add(candidate);
 				}
 			}
-
+			// --------------循环结束，没有找到合适的构造方法，那么会直接抛出异常
 			if (constructorToUse == null) {
 				if (causes != null) {
 					UnsatisfiedDependencyException ex = causes.removeLast();
@@ -279,6 +353,9 @@ class ConstructorResolver {
 						"Could not resolve matching constructor " +
 						"(hint: specify index/type/name arguments for simple parameters to avoid type ambiguities)");
 			}
+			/**
+			 * 如果 ambiguousConstructors 里面有值，抛出异常
+			 */
 			else if (ambiguousConstructors != null && !mbd.isLenientConstructorResolution()) {
 				throw new BeanCreationException(mbd.getResourceDescription(), beanName,
 						"Ambiguous constructor matches found in bean '" + beanName + "' " +
@@ -287,11 +364,21 @@ class ConstructorResolver {
 			}
 
 			if (explicitArgs == null && argsHolderToUse != null) {
+				/**
+				 * 缓存相关信息，比如：
+				 * 	1 已解析出的构造方法对象 resolvedConstructorOrFactoryMethod
+				 * 	2 构造方法参数列表是否已解析标志	constructorArgumentsResolved
+				 * 	3 参数值列表 	resolvedConstructorArguments 或 preparedConstructorArguments
+				 * 这些信息可用在其他地方，用于进行快捷判断
+				 */
 				argsHolderToUse.storeCache(mbd, constructorToUse);
 			}
 		}
 
 		Assert.state(argsToUse != null, "Unresolved constructor arguments");
+		/**
+		 * 最后到这里，使用我们找到的最佳 constructorToUse ，和参数，然后根据 instantiate 方法 new 对象
+		 */
 		bw.setBeanInstance(instantiate(beanName, mbd, constructorToUse, argsToUse));
 		return bw;
 	}
@@ -307,6 +394,9 @@ class ConstructorResolver {
 						this.beanFactory.getAccessControlContext());
 			}
 			else {
+				/**
+				 * 最终使用我们选好的创建实例的生成策略，然后调用 instantiate 方法去new 对象
+				 */
 				return strategy.instantiate(mbd, beanName, this.beanFactory, constructorToUse, argsToUse);
 			}
 		}

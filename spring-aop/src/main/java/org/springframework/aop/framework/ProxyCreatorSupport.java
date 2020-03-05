@@ -16,10 +16,10 @@
 
 package org.springframework.aop.framework;
 
+import org.springframework.util.Assert;
+
 import java.util.LinkedList;
 import java.util.List;
-
-import org.springframework.util.Assert;
 
 /**
  * Base class for proxy factories.
@@ -102,6 +102,10 @@ public class ProxyCreatorSupport extends AdvisedSupport {
 		if (!this.active) {
 			activate();
 		}
+		/**
+		 * AopProxy 有三个非常牛逼的实现。JDK一个，cglib两个。
+		 * 这里就是要确定到底返回哪个实现
+		 */
 		return getAopProxyFactory().createAopProxy(this);
 	}
 

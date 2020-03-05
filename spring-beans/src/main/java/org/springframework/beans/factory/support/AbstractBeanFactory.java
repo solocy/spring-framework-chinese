@@ -180,6 +180,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	public <T> T getBean(String name, @Nullable Class<T> requiredType, @Nullable Object... args)
 			throws BeansException {
 
+		// 又是一个空壳方法
 		return doGetBean(name, requiredType, args, false);
 	}
 
@@ -208,7 +209,15 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		Object bean;
 
 		// Eagerly check singleton cache for manually registered singletons.
+		/**
+		 * 这里spring会先根据 beanName 拿一遍，如果没有再去进行实例化
+		 * 对于初始化来说，这里99%等于空。所以主要是看下面 else 的代码。
+		 *
+		 * 矛盾点：既然我们这里是做的初始化bean的步骤，那么这里 getSingleton(beanName) 普通情况下拿到的绝对为null，那么为什么还要再拿一遍？
+		 * 原因：有一种情况下可能不为null。那就是lazy为true的时候
+		 */
 		Object sharedInstance = getSingleton(beanName);
+
 		if (sharedInstance != null && args == null) {
 			if (logger.isTraceEnabled()) {
 				if (isSingletonCurrentlyInCreation(beanName)) {
@@ -225,12 +234,20 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		else {
 			// Fail if we're already creating this bean instance:
 			// We're assumably within a circular reference.
+			/**
+			 * 原型
+			 * 如果是原型不应该在初始化的时候创建，防止spring内部出现问题。所以这个99.9%不会出现
+			 */
 			if (isPrototypeCurrentlyInCreation(beanName)) {
 				throw new BeanCurrentlyInCreationException(beanName);
 			}
 
 			// Check if bean definition exists in this factory.
+			/**
+			 * 因为我们没有对spring的 BeanFactory 进行改造，所以这句代码拿到的是 null ，所以不重要！
+			 */
 			BeanFactory parentBeanFactory = getParentBeanFactory();
+
 			if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
 				// Not found -> check parent.
 				String nameToLookup = originalBeanName(name);
@@ -252,6 +269,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			}
 
 			if (!typeCheckOnly) {
+				/**
+				 * 添加到 alreadyCreated set集合当中，表示他已经创建一次。不太重要，主要是为了防止重复创建
+				 */
 				markBeanAsCreated(beanName);
 			}
 
@@ -279,11 +299,18 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				}
 
 				// Create bean instance.
+				/**
+				 * 这里就是最最关键的地方了！！
+				 * 如果是单例对象，则进入这个方法，进行创建工作
+				 */
 				if (mbd.isSingleton()) {
+					/**
+					 * 这里就非常非常重要了
+					 */
 					sharedInstance = getSingleton(beanName, () -> {
-						try {
-							return createBean(beanName, mbd, args);
-						}
+							try {
+								return createBean(beanName, mbd, args);
+							}
 						catch (BeansException ex) {
 							// Explicitly remove instance from singleton cache: It might have been put there
 							// eagerly by the creation process, to allow for circular reference resolution.

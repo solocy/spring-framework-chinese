@@ -132,6 +132,9 @@ class ConfigurationClassBeanDefinitionReader {
 		if (configClass.isImported()) {
 			registerBeanDefinitionForImportedConfigurationClass(configClass);
 		}
+		/**
+		 * 如果一个类是加了@Bean，会在这里进行处理
+		 */
 		for (BeanMethod beanMethod : configClass.getBeanMethods()) {
 			loadBeanDefinitionsForBeanMethod(beanMethod);
 		}
@@ -213,6 +216,10 @@ class ConfigurationClassBeanDefinitionReader {
 		beanDef.setResource(configClass.getResource());
 		beanDef.setSource(this.sourceExtractor.extractSource(metadata, configClass.getResource()));
 
+		/**
+		 * 如果这个类的方法是 static 的
+		 * 那么每次调用这个加了@bean的方法都会产生一个新的对象。
+		 */
 		if (metadata.isStatic()) {
 			// static @Bean method
 			if (configClass.getMetadata() instanceof StandardAnnotationMetadata) {
@@ -221,6 +228,10 @@ class ConfigurationClassBeanDefinitionReader {
 			else {
 				beanDef.setBeanClassName(configClass.getMetadata().getClassName());
 			}
+			/**
+			 * 然后在这里设置了它的 FactoryMethod 的Name为 methodName
+			 *
+			 */
 			beanDef.setUniqueFactoryMethodName(methodName);
 		}
 		else {

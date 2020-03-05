@@ -374,7 +374,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			/**
 			 * 非常重要！！
 			 * 在这里把 configClasses 传进去，调用 loadBeanDefinitions 方法，这个方法就可以把属于ImportSelector和ImportBeanDefinitionRegistrar的类，
-			 * 放到bean工厂的bdMap中了
+			 * 和@Bean的类放到bean工厂的bdMap中了
 			 */
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);

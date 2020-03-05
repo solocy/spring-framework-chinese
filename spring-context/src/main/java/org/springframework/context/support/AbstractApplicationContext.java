@@ -532,23 +532,40 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				 *
 				 * 因为spring内部有成千上百个 beanPostProcessor,它要决定这个时候要使用哪个，把它放到一个此时需要用到一个list里面，所以这个时候才需要注册。
 				 *
-				 * 这个地方就是来注册 spring 内部的一些 BeanPostProcessors 后置处理器
+				 * 这个地方就是来注册 spring 内部的一些 BeanPostProcessors 后置处理器，和我们自己自定义的 BeanPostProcessors
 				 */
 				registerBeanPostProcessors(beanFactory);
 
 				// Initialize message source for this context.
+				/**
+				 * 这段代码不重要。是跟国际化相关的，现在很少有项目用到国际化的，所以这里并不重要
+				 * 这里只是国际化相关的技术，并不影响spring 实例化的整个流程
+				 */
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
+				/**
+				 * 这个是跟spring的event相关的，也不是说特别重要，后期有时间了再来看
+				 */
 				initApplicationEventMulticaster();
 
 				// Initialize other special beans in specific context subclasses.
+				/**
+				 * 这是一个空壳方法，里面没有任何代码，跳过不用看了！！
+				 */
 				onRefresh();
 
 				// Check for listener beans and register them.
+				/**
+				 * 这里是对 Listener 的各种注册，先放一放，后面来看
+				 */
 				registerListeners();
 
 				// Instantiate all remaining (non-lazy-init) singletons.
+				/**
+				 * 这个方法是重中之重！！！！  明星方法
+				 * 主要作用：实例化所有的单例对象。执行后置处理器且执行spring生命周期的init方法
+				 */
 				finishBeanFactoryInitialization(beanFactory);
 
 				// Last step: publish corresponding event.
@@ -890,6 +907,10 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	/**
 	 * Finish the initialization of this context's bean factory,
 	 * initializing all remaining singleton beans.
+	 *
+	 * ConversionService 这个是一个知识点。
+	 * 作用：类型转换
+	 * 用法：百度一下即可
 	 */
 	protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
 		// Initialize conversion service for this context.
@@ -907,18 +928,32 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		}
 
 		// Initialize LoadTimeWeaverAware beans early to allow for registering their transformers early.
+		/**
+		 * 这里是 aspectj 的静态织入（在编译时织入的）。
+		 * spring 不管是JDK，还是CGLIB 都是动态织入（在运行时织入）
+		 *
+		 * 这里是对静态织入环境的支持，这里我们基本是用不到的。
+		 */
 		String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
 		for (String weaverAwareName : weaverAwareNames) {
 			getBean(weaverAwareName);
 		}
 
 		// Stop using the temporary ClassLoader for type matching.
+		// 不清楚，没有用过这个 TempClassLoader
 		beanFactory.setTempClassLoader(null);
 
 		// Allow for caching all bean definition metadata, not expecting further changes.
 		beanFactory.freezeConfiguration();
 
 		// Instantiate all remaining (non-lazy-init) singletons.
+		/**
+		 * 压轴的才是最重要的。！！！
+		 * 实例化所有的单例对象
+		 *
+		 * preInstantiateSingletons 方法名，顾名思义：准备实例化单例对象
+		 * DefaultListableBeanFactory#preInstantiateSingletons
+		 */
 		beanFactory.preInstantiateSingletons();
 	}
 

@@ -372,6 +372,10 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Nullable
 	private <T> T resolveBean(ResolvableType requiredType, @Nullable Object[] args, boolean nonUniqueAsNull) {
+		/**
+		 * NamedBeanHolder 可以理解为一个数据结构和Map差不多，里面就是存了bean的名字和bean的实例
+		 * 通过 resolveNamedBean 方法得到这个holder，故而需要看这个 resolveNamedBean 方法如何得到这个holder的
+		 */
 		NamedBeanHolder<T> namedBean = resolveNamedBean(requiredType, args, nonUniqueAsNull);
 		if (namedBean != null) {
 			return namedBean.getBeanInstance();
@@ -809,14 +813,34 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 		// Iterate over a copy to allow for init methods which in turn register new bean definitions.
 		// While this may not be part of the regular factory bootstrap, it does otherwise work fine.
+		/**
+		 * 拿到所有要初始化的类的名字。也就是bdMap中所有的名字
+		 */
 		List<String> beanNames = new ArrayList<>(this.beanDefinitionNames);
 
 		// Trigger initialization of all non-lazy singleton beans...
+		/**
+		 * 触发所有非延迟加载单例beans的初始化，主要步骤为调用getBean
+		 */
 		for (String beanName : beanNames) {
+			/**
+			 * 这个我们用的不多，因为只有在xml中才有用，我们现在都不用xml。所以也并不是太重要
+			 * 作用：合并父tBeanDefinition，那么何为父类的bd？
+			 */
 			RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+			/**
+			 * 判断：不是抽象类，是单例，不是懒加载。  -- 此时才去执行
+			 */
 			if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
+				/**
+				 * 判断是不是 FactoryBean ，我们知道，FactoryBean 和普通的bean是有很大的区别的
+				 */
 				if (isFactoryBean(beanName)) {
+					/**
+					 * 如果是FactoryBean ，则为这个 beanName 添加一个 &。然后再去创建Bean
+					 */
 					Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
+
 					if (bean instanceof FactoryBean) {
 						final FactoryBean<?> factory = (FactoryBean<?>) bean;
 						boolean isEagerInit;
@@ -835,6 +859,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					}
 				}
 				else {
+					/**
+					 * 非常重要！！ 就是在这里完成的bean的创建
+					 */
 					getBean(beanName);
 				}
 			}
@@ -1096,6 +1123,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			ResolvableType requiredType, @Nullable Object[] args, boolean nonUniqueAsNull) throws BeansException {
 
 		Assert.notNull(requiredType, "Required type must not be null");
+		/**
+		 * 得到对象的名字，因为对象可能有别名故而需要处理别名
+		 */
 		String[] candidateNames = getBeanNamesForType(requiredType);
 
 		if (candidateNames.length > 1) {
@@ -1112,6 +1142,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 		if (candidateNames.length == 1) {
 			String beanName = candidateNames[0];
+			/**
+			 * 这里的getBean才是真正获取对象的方法
+			 */
 			return new NamedBeanHolder<>(beanName, (T) getBean(beanName, requiredType.toClass(), args));
 		}
 		else if (candidateNames.length > 1) {
@@ -1164,6 +1197,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			Object result = getAutowireCandidateResolver().getLazyResolutionProxyIfNecessary(
 					descriptor, requestingBeanName);
 			if (result == null) {
+				/**
+				 * 最终会进入这里
+				 */
 				result = doResolveDependency(descriptor, requestingBeanName, autowiredBeanNames, typeConverter);
 			}
 			return result;
@@ -1244,6 +1280,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				autowiredBeanNames.add(autowiredBeanName);
 			}
 			if (instanceCandidate instanceof Class) {
+				/**
+				 * 最核心的在这里！！！！
+				 */
 				instanceCandidate = descriptor.resolveCandidate(autowiredBeanName, type, this);
 			}
 			Object result = instanceCandidate;
